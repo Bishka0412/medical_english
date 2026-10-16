@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="mn"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Админ - Бүртгэл</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#f4f9f8;--s:#fff;--t:#10262a;--m:#56717a;--a:#12a594;--on:#fff;--l:#d9e8e6}
+@media (prefers-color-scheme:dark){:root{--bg:#0c1719;--s:#142427;--t:#ebf5f4;--m:#93aeb3;--a:#3fd0bd;--on:#04201c;--l:#233c40;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:20px}
+.w{max-width:960px;margin:0 auto}h1{font-size:24px;margin:0 0 16px}
+.box{background:var(--s);border:1px solid var(--l);border-radius:16px;padding:20px}
+input{padding:11px 13px;border-radius:10px;border:1px solid var(--l);background:var(--bg);color:var(--t);font-size:16px;font-family:inherit}
+button{background:var(--a);color:var(--on);border:0;border-radius:10px;padding:11px 18px;font-weight:700;font-size:15px;cursor:pointer}
+button.g{background:transparent;color:var(--a);border:2px solid var(--a)}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}.bar input{flex:1;min-width:180px}
+.cnt{color:var(--m);font-size:14px}.err{color:#d33;min-height:22px;margin-top:8px}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--l);white-space:nowrap}th{color:var(--m);font-size:13px}
+#app{display:none}
+</style></head><body><div class="w">
+<h1>Бүртгэлийн админ</h1>
+<div class="box" id="login"><p style="margin-top:0">Админ нууц үгээ оруулна уу.</p>
+<div class="bar"><input id="pw" type="password" placeholder="Нууц үг" onkeydown="if(event.key==='Enter')enter()"><button onclick="enter()">Нэвтрэх</button></div><div class="err" id="err"></div></div>
+<div class="box" id="app">
+<div class="bar"><input id="q" placeholder="Хайх (нэр, утас, хөтөлбөр)" oninput="draw()"><button onclick="load()" class="g">Шинэчлэх</button><button onclick="xl()">📥 Excel татах</button><button class="g" onclick="out()">Гарах</button></div>
+<div class="cnt" id="cnt"></div>
+<div class="tw"><table><thead><tr><th>#</th><th>Огноо</th><th>Овог нэр</th><th>Утас</th><th>Хөтөлбөр</th></tr></thead><tbody id="tb"></tbody></table></div>
+</div></div>
+<script>
+let rows=[],pw=sessionStorage.getItem('pw')||'';
+const $=id=>document.getElementById(id);
+const fmt=s=>new Date(s).toLocaleString('sv-SE',{timeZone:'Asia/Ulaanbaatar'});
+async function load(){
+  $('err').textContent='';
+  try{
+    const r=await fetch('/api/registrations',{headers:{Authorization:'Bearer '+pw}});
+    if(r.status===401){sessionStorage.removeItem('pw');$('login').style.display='block';$('app').style.display='none';if(pw)$('err').textContent='Нууц үг буруу байна';return}
+    if(!r.ok)throw 0;
+    rows=await r.json();$('login').style.display='none';$('app').style.display='block';draw();
+  }catch(e){$('err').textContent='Алдаа гарлаа. Дахин оролдоно уу.'}
+}
+function enter(){pw=$('pw').value;sessionStorage.setItem('pw',pw);load()}
+function out(){sessionStorage.removeItem('pw');pw='';location.reload()}
+function view(){const q=$('q').value.toLowerCase();return rows.filter(x=>(x.name+x.phone+x.course).toLowerCase().includes(q))}
+function draw(){
+  const v=view(),tb=$('tb');tb.textContent='';
+  v.forEach((x,i)=>{const tr=document.createElement('tr');
+    [v.length-i,fmt(x.at),x.name,x.phone,x.course].forEach(t=>{const td=document.createElement('td');td.textContent=t;tr.appendChild(td)});tb.appendChild(tr)});
+  $('cnt').textContent='Нийт '+rows.length+' бүртгэл'+(v.length!==rows.length?' · харагдаж буй '+v.length:'');
+}
+function xl(){
+  const data=view().map((x,i,a)=>({'№':a.length-i,'Огноо':fmt(x.at),'Овог нэр':x.name,'Утас':x.phone,'Хөтөлбөр':x.course}));
+  const ws=XLSX.utils.json_to_sheet(data);ws['!cols']=[{wch:5},{wch:20},{wch:28},{wch:14},{wch:28}];
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Бүртгэл');
+  XLSX.writeFile(wb,'burtgel_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+if(pw)load();
+</script></body></html>
